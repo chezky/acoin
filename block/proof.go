@@ -1,16 +1,12 @@
-package blockchain
+package block
 
-import(
+import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"math"
 	"math/big"
 	"strconv"
-)
-
-const (
-	targetBits = 24
 )
 
 type ProofOfWork struct {
@@ -26,12 +22,23 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-targetBits))
 
-	pow := &ProofOfWork{
-		b,
-		target,
+	return &ProofOfWork{
+		block: b,
+		target: target,
 	}
+}
 
-	return pow
+func (pow *ProofOfWork) PrepareData(nonce int) []byte {
+	return bytes.Join(
+		[][]byte{
+			pow.block.PrevBlockHash,
+			pow.block.Data,
+			IntToHex(pow.block.Timestamp),
+			IntToHex(int64(targetBits)),
+			IntToHex(int64(nonce)),
+		},
+		[]byte{},
+	)
 }
 
 func (pow *ProofOfWork) Run() (int, []byte) {
@@ -39,12 +46,12 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 		hashInt big.Int
 		hash [32]byte
 	)
-	maxNonce := math.MaxInt64
-	nonce := 0
 
-	//fmt.Printf("Mining the block containing \"%s\"\n", pow.block.)
-	for nonce < maxNonce {
-		data := pow.prepareDate(nonce)
+	nonce := 0
+	fmt.Printf("Mining block containing \"%s\"\n", pow.block.Data)
+
+	for nonce < math.MaxInt64 {
+		data := pow.PrepareData(nonce)
 		hash = sha256.Sum256(data)
 		fmt.Printf("\r%x", hash)
 		hashInt.SetBytes(hash[:])
@@ -52,34 +59,19 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 		if hashInt.Cmp(pow.target) == -1 {
 			break
 		} else {
-			nonce ++
+			nonce++
 		}
 	}
 
-	fmt.Printf("\n\n")
+	fmt.Print("\n\n")
 
 	return nonce, hash[:]
-
-}
-
-func (pow *ProofOfWork) prepareDate(nonce int) []byte {
-	data := bytes.Join(
-		[][]byte{
-			pow.block.PrevBlockHash,
-			pow.block.HashTransactions(),
-			IntToHex(pow.block.Timestamp),
-			IntToHex(int64(targetBits)),
-			IntToHex(int64(nonce)),
-		},
-		[]byte{},
-	)
-	return data
 }
 
 func (pow *ProofOfWork) Validate() bool {
 	var hashInt big.Int
 
-	data := pow.prepareDate(pow.block.Nonce)
+	data := pow.PrepareData(pow.block.Nonce)
 	hash := sha256.Sum256(data)
 	hashInt.SetBytes(hash[:])
 

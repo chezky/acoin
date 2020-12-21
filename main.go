@@ -1,41 +1,66 @@
 package main
 
 import (
-	_ "encoding/gob"
 	"flag"
 	"fmt"
-	"github.com/chezky/acoin/blockchain"
+	"github.com/chezky/acoin/block"
 	"os"
 	"strconv"
 )
 
-type CLI struct {}
+type CLI struct{
+	bc *block.Blockchain
+}
+
+func (cli *CLI) addBlock(data string) {
+	cli.bc.AddBlock(data)
+	fmt.Println("success")
+}
+
+func (cli *CLI) printChain() {
+	itr := cli.bc.Iterator()
+
+	for {
+		blk := itr.Next()
+
+		fmt.Printf("Prev Hash: %x\n", blk.PrevBlockHash)
+		fmt.Printf("Data: %s\n", blk.Data)
+		fmt.Printf("Hash %x\n", blk.Hash)
+		prf := block.NewProofOfWork(blk)
+		fmt.Printf("PoW: %s\n", strconv.FormatBool(prf.Validate()))
+		fmt.Println()
+
+		if len(blk.PrevBlockHash) == 0 {
+			break
+		}
+	}
+}
 
 func (cli *CLI) Run() {
-	creatBCCmd := flag.NewFlagSet("createblockchain", flag.ExitOnError)
+	addBlockCmd := flag.NewFlagSet("addblock", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 
-	createBCAddress := creatBCCmd.String("address", "", "The address you want the value of")
+	addBlockData := addBlockCmd.String("data", "", "Block Data")
 
 	switch os.Args[1] {
-	case "createblockchain":
-		err := creatBCCmd.Parse(os.Args[2:]); if err != nil {
+	case "addblock":
+		err := addBlockCmd.Parse(os.Args[2:]); if err != nil {
 			panic(err)
 		}
 	case "printchain":
-		err := printChainCmd.Parse(os.Args[2:]); if err != nil{
-			fmt.Println("error printchain", err)
+		err := printChainCmd.Parse(os.Args[2:]); if err != nil {
+			panic(err)
 		}
 	default:
 		os.Exit(1)
 	}
 
-	if creatBCCmd.Parsed() {
-		if *createBCAddress == "" {
-			creatBCCmd.Usage()
+	if addBlockCmd.Parsed(){
+		if *addBlockData == "" {
+			addBlockCmd.Usage()
 			os.Exit(1)
 		}
-		cli.createBlockchain(*createBCAddress)
+		cli.addBlock(*addBlockData)
 	}
 
 	if printChainCmd.Parsed() {
@@ -43,35 +68,9 @@ func (cli *CLI) Run() {
 	}
 }
 
-func (cli *CLI) createBlockchain(address string) {
-	bc := blockchain.CreateBlockChain(address)
-	bc.Db.Close()
-	fmt.Println("Done!")
-}
-
-func (cli *CLI) printChain() {
-	bc := blockchain.CreateBlockChain("")
-	defer bc.Db.Close()
-
-	bci := bc.Iterator()
-
-	for {
-		block := bci.Next()
-
-		fmt.Printf("Prev hash: %x\n", block.PrevBlockHash)
-		fmt.Printf("Transactions count %d\n", len(block.Transactions))
-		fmt.Printf("Hash %x\n", block.Hash)
-		pow := blockchain.NewProofOfWork(block)
-		fmt.Printf("PoW: %s", strconv.FormatBool(pow.Validate()))
-		fmt.Println()
-
-		if len(block.PrevBlockHash) == 0 {
-			break
-		}
-	}
-}
-
 func main() {
-	cli := CLI{}
+	bc := block.NewBlockChain()
+	defer bc.DB.Close()
+	cli := CLI{bc}
 	cli.Run()
 }
