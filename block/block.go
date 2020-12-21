@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	targetBits = 20
+	targetBits = 5
 	dbFile = "blocks.db"
 	blocksBucket = "blockBucket"
 	subsidy = 10
@@ -71,6 +71,7 @@ func DeserializeBlock(d []byte) *Block {
 	// decode d into block
 	err := decoder.Decode(&block); if err != nil {
 		fmt.Println("error decoding block", err)
+		os.Exit(1)
 	}
 
 	return &block
