@@ -4,31 +4,41 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"os"
 	"time"
 )
 
 const (
-	targetBits = 24
+	targetBits = 20
 	dbFile = "blocks.db"
 	blocksBucket = "blockBucket"
+	subsidy = 10
+	genesisCoinbaseData = "Genesis block for ACN"
 )
 
 type Block struct {
 	Timestamp int64
-	Data []byte
+	Transactions []*Transaction
 	PrevBlockHash []byte
 	Hash []byte
 	Nonce int
 }
 
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
+func DBExists() bool {
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
-func NewBlock(data string, prevBlockHash []byte) *Block {
+func NewGenesisBlock(coinbase *Transaction) *Block {
+	return NewBlock([]*Transaction{coinbase}, []byte{})
+}
+
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
 		Timestamp: time.Now().Unix(),
-		Data: []byte(data),
+		Transactions: transactions,
 		PrevBlockHash: prevBlockHash,
 		Hash: []byte{},
 		Nonce: 0,

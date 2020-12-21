@@ -3,6 +3,7 @@ package block
 import (
 	"fmt"
 	"github.com/boltdb/bolt"
+	"os"
 )
 
 type Blockchain struct {
@@ -15,7 +16,51 @@ type BlockchainIterator struct {
 	DB *bolt.DB
 }
 
-func NewBlockChain() *Blockchain {
+func CreateBlockchain(address string) *Blockchain {
+	if DBExists() {
+		fmt.Println("Blockchain already exists.")
+		os.Exit(1)
+	}
+
+	var tip []byte
+
+	db, err := bolt.Open(dbFile, 0600, nil); if err != nil {
+		panic(err)
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
+		genesis := NewGenesisBlock(cbtx)
+
+		b, err := tx.CreateBucket([]byte(blocksBucket)); if err != nil {
+			panic(err)
+		}
+		err = b.Put(genesis.Hash, genesis.Serialize()); if err != nil {
+			panic(err)
+		}
+		err = b.Put([]byte("l"), genesis.Hash); if err != nil {
+			panic(err)
+		}
+
+		tip = genesis.Hash
+
+		return nil
+	}); if err != nil {
+		panic(err)
+	}
+
+	return &Blockchain{
+		Tip: tip,
+		DB:  db,
+	}
+}
+
+func NewBlockChain(address string) *Blockchain {
+	if !DBExists() {
+		fmt.Println("No existing blockchain found. Please create one first.")
+		os.Exit(1)
+	}
+
 	var tip []byte
 
 	db, err := bolt.Open(dbFile, 0600, nil); if err != nil {
@@ -24,23 +69,7 @@ func NewBlockChain() *Blockchain {
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
-
-		if b == nil {
-			fmt.Println("No blockchain found. Creating a new one...")
-			genesis := NewGenesisBlock()
-			b, err := tx.CreateBucket([]byte(blocksBucket)); if err != nil {
-				panic(err)
-			}
-			err = b.Put(genesis.Hash, genesis.Serialize()); if err != nil {
-				fmt.Print("error putting in genesis block", err)
-			}
-			err = b.Put([]byte("l"), genesis.Hash); if err != nil {
-				fmt.Println("error updating tail with genesis", err)
-			}
-			tip = genesis.Hash
-		} else {
-			tip = b.Get([]byte("l"))
-		}
+		tip = b.Get([]byte("l"))
 		return nil
 	}); if err != nil {
 		panic(err)
@@ -52,7 +81,7 @@ func NewBlockChain() *Blockchain {
 	}
 }
 
-func(bc *Blockchain) AddBlock(data string) {
+func(bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
 
 	err := bc.DB.View(func(tx *bolt.Tx) error {
@@ -63,7 +92,7 @@ func(bc *Blockchain) AddBlock(data string) {
 		panic(err)
 	}
 
-	newBlock := NewBlock(data, lastHash)
+	newBlock := NewBlock(transactions, lastHash)
 
 	err = bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
