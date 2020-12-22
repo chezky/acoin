@@ -20,7 +20,7 @@ type Transaction struct {
 // Outputs that are referenced are spent and can't be used. Unreferenced outputs are open to being sent/spent/transferred.
 type TXOutput struct {
 	Value int // amount of "coins" on the outputs
-	ScriptPubKey string // signature of to whom the coins belong
+	PubKeyHash []byte
 }
 
 // TXInput represents a single input. An input must always reference an output. The input contains an id of which transaction it references, and the index of
@@ -28,7 +28,23 @@ type TXOutput struct {
 type TXInput struct {
 	Txid []byte
 	Vout int // index of the output it is referencing
-	ScriptSig string // signature of who spent the coins
+	Signature []byte
+	PubKey []byte
+}
+
+func (in *TXInput) UsesKey(pubKeyHash []byte) bool {
+	lockingHash := HashPubKey(in.PubKey)
+	return bytes.Compare(lockingHash, pubKeyHash) == 0
+}
+
+func (out *TXOutput) Lock(address []byte) {
+	pubKeyHash := Base58Decode(address)
+	pubKeyHash = pubKeyHash[1: len(pubKeyHash)-4]
+	out.PubKeyHash = pubKeyHash
+}
+
+func (out *TXOutput) IsLockedWithKey(pubKey []byte) bool {
+	return bytes.Compare(out.PubKeyHash, pubKey) == 0
 }
 
 // IsCoinbase checks if it's the outputs from the genesis block
@@ -50,6 +66,15 @@ func (tx *Transaction) SetID() {
 	tx.ID = hash[:]
 }
 
+func NewTXOutput(value int, address string) *TXOutput {
+	txo := &TXOutput{
+		Value:      value,
+		PubKeyHash: nil,
+	}
+	txo.Lock([]byte(address))
+	return txo
+}
+
 // NewCoinbaseTX creates a new transaction for the initial genesis block
 func NewCoinbaseTX(to, data string) *Transaction {
 	if data == "" {
@@ -59,18 +84,16 @@ func NewCoinbaseTX(to, data string) *Transaction {
 	txin := TXInput{
 		Txid:      []byte{},
 		Vout:      -1,
-		ScriptSig: data,
+		Signature: nil,
+		PubKey:    []byte(data),
 	}
 	
-	txout := TXOutput{
-		Value:        subsidy,
-		ScriptPubKey: to,
-	}
+	txout := NewTXOutput(subsidy, to)
 
 	tx := Transaction{
 		ID:   nil,
 		Vin:  []TXInput{txin},
-		Vout: []TXOutput{txout},
+		Vout: []TXOutput{*txout},
 	}
 
 	tx.SetID()
@@ -92,22 +115,22 @@ func (b *Block) HashTransactions() []byte {
 	return txHash[:]
 }
 
-// CanUnlockOutputWith checks if the signature on an input matches the key being passed in
-func (in *TXInput) CanUnlockOutputWith(unlockingData string) bool {
-	return in.ScriptSig == unlockingData
-}
-
-// CanBeUnlockedWith checks if the output pub key matches the key being passed in
-func (out *TXOutput) CanBeUnlockedWith(unlockingData string) bool {
-	return out.ScriptPubKey == unlockingData
-}
+//// CanUnlockOutputWith checks if the signature on an input matches the key being passed in
+//func (in *TXInput) CanUnlockOutputWith(unlockingData string) bool {
+//	return in.ScriptSig == unlockingData
+//}
+//
+//// CanBeUnlockedWith checks if the output pub key matches the key being passed in
+//func (out *TXOutput) CanBeUnlockedWith(unlockingData string) bool {
+//	return out.ScriptPubKey == unlockingData
+//}
 
 // FindUnspentTransactions loops over every block in a blockchain. For every transaction, it checks for unspent transactions.
 // For every Output in a transaction, check if that output was already "spent"/referenced by an input. The first/tail block will always be
 // nil since no outputs have been referenced. Then check if any of those outputs belong to the address you requested. If they do, add the transaction.
 // If not, for every input that belongs to the address, add it to a map. The next time the loops runs, when it looks for free outputs, if they are on that map
 // they are definitely not free.
-func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
+func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 	var unspentTXs []Transaction
 	spentTXOs := make(map[string][]int)
 	bci := bc.Iterator()
@@ -127,15 +150,15 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 				fmt.Println("SpentTXOs: ", spentTXOs)
 				//	was the output spent?
 				if spentTXOs[txID] != nil {
-					for _, spentOut := range spentTXOs[txID] {
-						if spentOut == outIdx {
+					for _, spentOutIdx := range spentTXOs[txID] {
+						if spentOutIdx == outIdx {
 							fmt.Printf("Output #%d was already referenced\n", outIdx)
 							continue Outputs
 						}
 					}
 				}
 				//if it wasn't spent yet, verify that is can be unlocked
-				if out.CanBeUnlockedWith(address) {
+				if out.IsLockedWithKey(pubKeyHash) {
 					// only if it can be unlocked with that address, can it be counted as an unspentTX
 					unspentTXs = append(unspentTXs, *tx)
 				}
@@ -144,7 +167,7 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 				// spentTXOs starts off blank, since the tail block always has open outputs
 				// if an input references an output, then that input is spent
 				for _, in := range tx.Vin {
-					if in.CanUnlockOutputWith(address) {
+					if in.UsesKey(pubKeyHash) {
 						inTxID := hex.EncodeToString(in.Txid)
 						fmt.Println("appending tx id: ", inTxID)
 						spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Vout)
@@ -161,13 +184,13 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 }
 
 // FindUTXOs checks and verifies all outputs in a transaction, whether or not they belong to that address
-func (bc *Blockchain) FindUTXOs(address string) []TXOutput {
+func (bc *Blockchain) FindUTXOs(pubKeyHash []byte) []TXOutput {
 	var UTXOs []TXOutput
-	unspentTXs := bc.FindUnspentTransactions(address)
+	unspentTXs := bc.FindUnspentTransactions(pubKeyHash)
 
 	for _, tx := range unspentTXs {
 		for _, out := range tx.Vout {
-			if out.CanBeUnlockedWith(address) {
+			if out.IsLockedWithKey(pubKeyHash) {
 				UTXOs = append(UTXOs, out)
 			}
 		}
@@ -186,7 +209,13 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transactio
 		outputs []TXOutput
 	)
 
-	acc, validOutputs := bc.FindSpendableOutputs(from, amount)
+	wallets, err := NewWallets(); if err != nil {
+		panic(err)
+	}
+	wallet := wallets.GetWallet(from)
+	pubKeyHash := HashPubKey(wallet.PublicKey)
+
+	acc, validOutputs := bc.FindSpendableOutputs(pubKeyHash, amount)
 
 	if acc < amount {
 		fmt.Println("ERROR: Not enough funds")
@@ -204,16 +233,17 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transactio
 			input := TXInput{
 				Txid:      txID,
 				Vout:      out,
-				ScriptSig: from,
+				Signature: nil,
+				PubKey:    wallet.PublicKey,
 			}
 			inputs = append(inputs, input)
 		}
 	}
 
 	// build a list of outputs
-	outputs = append(outputs, TXOutput{amount, to})
+	outputs = append(outputs, *NewTXOutput(amount, to))
 	if acc > amount {
-		outputs = append(outputs, TXOutput{acc-amount, from}) // if its not exactly the amount, create change. For example if its 30 and he only needed 25
+		outputs = append(outputs, *NewTXOutput(acc-amount, from)) // if its not exactly the amount, create change. For example if its 30 and he only needed 25
 	}
 
 	tx := Transaction{
@@ -228,9 +258,9 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transactio
 
 // FindSpendableOutputs gets a list of unspent transactions. It then loops over every transaction, and checks if any of the outputs match the signature.
 // If they do, add the "coins"/value of the output to a variable. Once it finds enough coins, break the loop, and return a map of the outputs ID's that store the coins it found.
-func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
+func (bc *Blockchain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int, map[string][]int) {
 	unspentOutputs := make(map[string][]int)
-	unspentTXs := bc.FindUnspentTransactions(address)
+	unspentTXs := bc.FindUnspentTransactions(pubKeyHash)
 	accumulated := 0
 
 Work:
@@ -238,7 +268,7 @@ Work:
 		txID := hex.EncodeToString(tx.ID)
 
 		for outIdx, out := range tx.Vout {
-			if out.CanBeUnlockedWith(address) && accumulated < amount {
+			if out.IsLockedWithKey(pubKeyHash) && accumulated < amount {
 				accumulated += out.Value
 				unspentOutputs[txID] = append(unspentOutputs[txID], outIdx)
 

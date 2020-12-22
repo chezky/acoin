@@ -36,7 +36,7 @@ func (cli *CLI) printChain() {
 			for idxOut, out := range tx.Vout {
 				fmt.Printf("output # %d/%d\n", idxOut+1, len(tx.Vout))
 				fmt.Printf("output value: %d\n", out.Value)
-				fmt.Printf("output sig: %s\n", out.ScriptPubKey)
+				fmt.Printf("output pubKeyHash: %s\n", out.PubKeyHash)
 			}
 		}
 		fmt.Printf("Hash %x\n", blk.Hash)
@@ -54,7 +54,9 @@ func (cli *CLI) getBalance(address string) {
 	bc := block.NewBlockChain(address)
 	defer bc.DB.Close()
 	balance := 0
-	UTXOs := bc.FindUTXOs(address)
+	pubKeyHash := block.Base58Decode([]byte(address))
+	pubKeyHash = pubKeyHash[1: len(pubKeyHash) - 4]
+	UTXOs := bc.FindUTXOs(pubKeyHash)
 	for _, out := range UTXOs {
 		balance += out.Value
 	}
@@ -71,11 +73,23 @@ func (cli *CLI) send(from, to string, amount int) {
 	fmt.Println("Success!")
 }
 
+func (cli *CLI) createWallet() {
+	wallets, err := block.NewWallets(); if err != nil {
+		fmt.Println("error creating wallet", err)
+		//os.Exit(1)
+	}
+	address := wallets.CreateWallet()
+	wallets.SaveToFile()
+
+	fmt.Printf("Your new addres is %s\n", address)
+}
+
 func(cli *CLI) Run() {
 	createChainCmd := flag.NewFlagSet("createchain", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
+	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
 
 	createChainAddress := createChainCmd.String("address", "", "Address to which initial chain should belong to")
 	createBalanceAddress := getBalanceCmd.String("address", "", "Address to which balance you would like to check")
@@ -99,6 +113,10 @@ func(cli *CLI) Run() {
 		}
 	case "send":
 		err := sendCmd.Parse(os.Args[2:]); if err != nil {
+			panic(err)
+		}
+	case "createwallet":
+		err := createWalletCmd.Parse(os.Args[2:]); if err != nil {
 			panic(err)
 		}
 	default:
@@ -136,7 +154,9 @@ func(cli *CLI) Run() {
 		}
 		cli.send(*createSendFrom, *createSendTo, amt)
 	}
-
+	if createWalletCmd.Parsed() {
+		cli.createWallet()
+	}
 }
 
 func main() {

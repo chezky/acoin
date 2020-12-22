@@ -65,7 +65,9 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	for nonce < math.MaxInt64 {
 		data := pow.PrepareData(nonce)
 		hash = sha256.Sum256(data)
-		fmt.Printf("\r%x", hash)
+		if nonce % 100000 == 99999 {
+			fmt.Printf("\r%x", hash)
+		}
 		hashInt.SetBytes(hash[:])
 
 		if hashInt.Cmp(pow.target) == -1 {

@@ -9,11 +9,15 @@ import (
 )
 
 const (
-	targetBits = 5
+	targetBits = 18
 	dbFile = "blocks.db"
 	blocksBucket = "blockBucket"
 	subsidy = 10
 	genesisCoinbaseData = "Genesis block for ACN"
+	addressChecksumLen = 4
+	// version setting
+	version = byte(0x00)
+	walletFile = "wallet.dat"
 )
 
 // Block represents a single block withing a blockchain. A block contains headers, and the body (transactions). A block always references the previous block in a chain.
