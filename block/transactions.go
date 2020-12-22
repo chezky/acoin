@@ -11,38 +11,43 @@ import (
 
 // Transaction represents a single transaction
 type Transaction struct {
-	ID []byte
-	Vin []TXInput // list of inputs // inputs always reference an output
+	ID   []byte
+	Vin  []TXInput  // list of inputs // inputs always reference an output
 	Vout []TXOutput // list of outputs // outputs that are referenced are "taken", unreferenced outputs have a value that can be spent
 }
 
 // TXOutput represents a single transaction output. TXOutputs store "coins", and are locked by a public key. The key can only be unlocked by the coins owner.
 // Outputs that are referenced are spent and can't be used. Unreferenced outputs are open to being sent/spent/transferred.
 type TXOutput struct {
-	Value int // amount of "coins" on the outputs
+	Value      int // amount of "coins" on the outputs
 	PubKeyHash []byte
 }
 
 // TXInput represents a single input. An input must always reference an output. The input contains an id of which transaction it references, and the index of
 // which output within that referenced transaction. It also contains the address/signature of who spent the coins. An input means that coins were spent/send/transferred.
 type TXInput struct {
-	Txid []byte
-	Vout int // index of the output it is referencing
+	Txid      []byte
+	Vout      int // index of the output it is referencing
 	Signature []byte
-	PubKey []byte
+	PubKey    []byte
 }
 
+// UsesKey checks if the inputs lock hash matches the hash of the public key. If yes then it belongs to that address.
 func (in *TXInput) UsesKey(pubKeyHash []byte) bool {
 	lockingHash := HashPubKey(in.PubKey)
 	return bytes.Compare(lockingHash, pubKeyHash) == 0
 }
 
+// Lock takes in an address, decodes it, removes the version and checksum, and then assigns it to the outputs public key.
+// Only this address can now unlock the output.
 func (out *TXOutput) Lock(address []byte) {
 	pubKeyHash := Base58Decode(address)
-	pubKeyHash = pubKeyHash[1: len(pubKeyHash)-4]
+	//[1: removes the version (first 1 byte, which is 2 numbers), and then :len(pubKeyHash)-4] removes the last checksum (last 4 bytes, 8 numbers long)
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
 	out.PubKeyHash = pubKeyHash
 }
 
+// IsLockedWithKey checks if the output was locked with the public key it's being tested against.
 func (out *TXOutput) IsLockedWithKey(pubKey []byte) bool {
 	return bytes.Compare(out.PubKeyHash, pubKey) == 0
 }
@@ -51,15 +56,17 @@ func (out *TXOutput) IsLockedWithKey(pubKey []byte) bool {
 func (tx Transaction) IsCoinbase() bool {
 	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
 }
+
 // SetID sets a transaction id. It's a hash of an encoded transaction
 func (tx *Transaction) SetID() {
 	var (
 		encoded bytes.Buffer
-		hash [32]byte
+		hash    [32]byte
 	)
 
 	enc := gob.NewEncoder(&encoded)
-	err := enc.Encode(tx); if err != nil {
+	err := enc.Encode(tx)
+	if err != nil {
 		panic(err)
 	}
 	hash = sha256.Sum256(encoded.Bytes())
@@ -87,7 +94,7 @@ func NewCoinbaseTX(to, data string) *Transaction {
 		Signature: nil,
 		PubKey:    []byte(data),
 	}
-	
+
 	txout := NewTXOutput(subsidy, to)
 
 	tx := Transaction{
@@ -104,7 +111,7 @@ func NewCoinbaseTX(to, data string) *Transaction {
 func (b *Block) HashTransactions() []byte {
 	var (
 		txHashes [][]byte
-		txHash [32]byte
+		txHash   [32]byte
 	)
 
 	for _, tx := range b.Transactions {
@@ -114,16 +121,6 @@ func (b *Block) HashTransactions() []byte {
 	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
 	return txHash[:]
 }
-
-//// CanUnlockOutputWith checks if the signature on an input matches the key being passed in
-//func (in *TXInput) CanUnlockOutputWith(unlockingData string) bool {
-//	return in.ScriptSig == unlockingData
-//}
-//
-//// CanBeUnlockedWith checks if the output pub key matches the key being passed in
-//func (out *TXOutput) CanBeUnlockedWith(unlockingData string) bool {
-//	return out.ScriptPubKey == unlockingData
-//}
 
 // FindUnspentTransactions loops over every block in a blockchain. For every transaction, it checks for unspent transactions.
 // For every Output in a transaction, check if that output was already "spent"/referenced by an input. The first/tail block will always be
@@ -142,7 +139,7 @@ func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 		blockIdx++
 
 		// iterate over every transaction in a block
-		for _, tx := range block.Transactions{
+		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
 
 		Outputs:
@@ -183,7 +180,7 @@ func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 	return unspentTXs
 }
 
-// FindUTXOs checks and verifies all outputs in a transaction, whether or not they belong to that address
+// FindUTXOs checks and verifies all outputs in a transaction that contains unsent outputs, whether or not they belong to that public key
 func (bc *Blockchain) FindUTXOs(pubKeyHash []byte) []TXOutput {
 	var UTXOs []TXOutput
 	unspentTXs := bc.FindUnspentTransactions(pubKeyHash)
@@ -205,11 +202,12 @@ func (bc *Blockchain) FindUTXOs(pubKeyHash []byte) []TXOutput {
 // the coins on that new output. Finally, using the newly created input and output(s), return a transaction that can then be stored in a block.
 func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transaction {
 	var (
-		inputs []TXInput
+		inputs  []TXInput
 		outputs []TXOutput
 	)
 
-	wallets, err := NewWallets(); if err != nil {
+	wallets, err := NewWallets()
+	if err != nil {
 		panic(err)
 	}
 	wallet := wallets.GetWallet(from)
@@ -225,7 +223,8 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transactio
 
 	// build a list of inputs
 	for txid, outs := range validOutputs {
-		txID, err := hex.DecodeString(txid); if err != nil {
+		txID, err := hex.DecodeString(txid)
+		if err != nil {
 			panic(err)
 		}
 

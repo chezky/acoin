@@ -6,18 +6,12 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"strconv"
 )
 
 // ProofOfWork represent a single ProofOfWork instance.
 type ProofOfWork struct {
-	block *Block
+	block  *Block
 	target *big.Int
-}
-
-// IntToHex takes in an int64 and returns a byte slice of that int64 formatted to base16
-func IntToHex(n int64) []byte {
-	return []byte(strconv.FormatInt(n, 16))
 }
 
 // NewProofOfWork takes in a block and returns a ProofOfWork. the PoW target is set to the largest number allowed. For example, if we only want to allow hashes smaller
@@ -29,7 +23,7 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 	target.Lsh(target, uint(256-targetBits))
 
 	return &ProofOfWork{
-		block: b,
+		block:  b,
 		target: target,
 	}
 }
@@ -56,7 +50,7 @@ func (pow *ProofOfWork) PrepareData(nonce int) []byte {
 func (pow *ProofOfWork) Run() (int, []byte) {
 	var (
 		hashInt big.Int
-		hash [32]byte
+		hash    [32]byte
 	)
 
 	nonce := 0
@@ -65,7 +59,7 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	for nonce < math.MaxInt64 {
 		data := pow.PrepareData(nonce)
 		hash = sha256.Sum256(data)
-		if nonce % 100000 == 99999 {
+		if nonce%100000 == 99999 {
 			fmt.Printf("\r%x", hash)
 		}
 		hashInt.SetBytes(hash[:])

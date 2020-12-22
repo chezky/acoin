@@ -9,13 +9,13 @@ import (
 // Blockchain represents an entire blockchain. It stores the tip/tail/(hash of the last block) in a blockchain.
 type Blockchain struct {
 	Tip []byte
-	DB *bolt.DB
+	DB  *bolt.DB
 }
 
 // BlockchainIterator stores the current hash of the block you are about to iterate over
 type BlockchainIterator struct {
 	currentHash []byte
-	DB *bolt.DB
+	DB          *bolt.DB
 }
 
 // CreateBlockchain creates a blockchain. It first creates a genesis block, and signs the output with the address of the creator.
@@ -27,7 +27,8 @@ func CreateBlockchain(address string) *Blockchain {
 
 	var tip []byte
 
-	db, err := bolt.Open(dbFile, 0600, nil); if err != nil {
+	db, err := bolt.Open(dbFile, 0600, nil)
+	if err != nil {
 		panic(err)
 	}
 
@@ -35,20 +36,24 @@ func CreateBlockchain(address string) *Blockchain {
 		cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
 		genesis := NewGenesisBlock(cbtx)
 
-		b, err := tx.CreateBucket([]byte(blocksBucket)); if err != nil {
+		b, err := tx.CreateBucket([]byte(blocksBucket))
+		if err != nil {
 			panic(err)
 		}
-		err = b.Put(genesis.Hash, genesis.Serialize()); if err != nil {
+		err = b.Put(genesis.Hash, genesis.Serialize())
+		if err != nil {
 			panic(err)
 		}
-		err = b.Put([]byte("l"), genesis.Hash); if err != nil {
+		err = b.Put([]byte("l"), genesis.Hash)
+		if err != nil {
 			panic(err)
 		}
 
 		tip = genesis.Hash
 
 		return nil
-	}); if err != nil {
+	})
+	if err != nil {
 		panic(err)
 	}
 
@@ -67,7 +72,8 @@ func NewBlockChain(address string) *Blockchain {
 
 	var tip []byte
 
-	db, err := bolt.Open(dbFile, 0600, nil); if err != nil {
+	db, err := bolt.Open(dbFile, 0600, nil)
+	if err != nil {
 		panic(err)
 	}
 
@@ -75,26 +81,28 @@ func NewBlockChain(address string) *Blockchain {
 		b := tx.Bucket([]byte(blocksBucket))
 		tip = b.Get([]byte("l"))
 		return nil
-	}); if err != nil {
+	})
+	if err != nil {
 		panic(err)
 	}
 
 	return &Blockchain{
 		Tip: tip,
-		DB: db,
+		DB:  db,
 	}
 }
 
 // MineBlock takes in a list of transactions, finds the last hash of a blockchain, and creates a new block with the transactions and last hash.
 // Then it updates the db and inserts the block, and updates the tail to be the hash of this new block.
-func(bc *Blockchain) MineBlock(transactions []*Transaction) {
+func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
 
 	err := bc.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		lastHash = b.Get([]byte("l"))
 		return nil
-	}); if err != nil {
+	})
+	if err != nil {
 		panic(err)
 	}
 
@@ -102,15 +110,18 @@ func(bc *Blockchain) MineBlock(transactions []*Transaction) {
 
 	err = bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
-		err := b.Put(newBlock.Hash, newBlock.Serialize()); if err != nil {
+		err := b.Put(newBlock.Hash, newBlock.Serialize())
+		if err != nil {
 			panic(err)
 		}
-		err = b.Put([]byte("l"), newBlock.Hash); if err != nil{
+		err = b.Put([]byte("l"), newBlock.Hash)
+		if err != nil {
 			panic(err)
 		}
 		bc.Tip = newBlock.Hash
 		return nil
-	}); if err != nil {
+	})
+	if err != nil {
 		panic(err)
 	}
 }
@@ -134,7 +145,8 @@ func (i *BlockchainIterator) Next() *Block {
 		encBlock := b.Get(i.currentHash)
 		block = DeserializeBlock(encBlock)
 		return nil
-	}); if err != nil {
+	})
+	if err != nil {
 		panic(err)
 	}
 

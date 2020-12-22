@@ -47,6 +47,5 @@ func Base58Decode(input []byte) []byte {
 	if input[0] == b58Alphabet[0] {
 		decoded = append([]byte{0x00}, decoded...)
 	}
-
 	return decoded
 }

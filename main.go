@@ -11,7 +11,7 @@ import (
 // CLI is a struct used for calling the cli. It holds the cli state.
 type CLI struct{}
 
-func(cli *CLI) createChain(address string) {
+func (cli *CLI) createChain(address string) {
 	_ = block.CreateBlockchain(address)
 }
 
@@ -55,7 +55,7 @@ func (cli *CLI) getBalance(address string) {
 	defer bc.DB.Close()
 	balance := 0
 	pubKeyHash := block.Base58Decode([]byte(address))
-	pubKeyHash = pubKeyHash[1: len(pubKeyHash) - 4]
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
 	UTXOs := bc.FindUTXOs(pubKeyHash)
 	for _, out := range UTXOs {
 		balance += out.Value
@@ -74,17 +74,18 @@ func (cli *CLI) send(from, to string, amount int) {
 }
 
 func (cli *CLI) createWallet() {
-	wallets, err := block.NewWallets(); if err != nil {
+	wallets, err := block.NewWallets()
+	if err != nil {
 		fmt.Println("error creating wallet", err)
 		//os.Exit(1)
 	}
 	address := wallets.CreateWallet()
 	wallets.SaveToFile()
 
-	fmt.Printf("Your new addres is %s\n", address)
+	fmt.Printf("Your new address is %s\n", address)
 }
 
-func(cli *CLI) Run() {
+func (cli *CLI) Run() {
 	createChainCmd := flag.NewFlagSet("createchain", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
@@ -97,26 +98,30 @@ func(cli *CLI) Run() {
 	createSendTo := sendCmd.String("to", "", "Address to whom this money is being sent to")
 	createSendAmount := sendCmd.String("amount", "", "Amount of money being sent")
 
-
 	switch os.Args[1] {
 	case "createchain":
-		err := createChainCmd.Parse(os.Args[2:]); if err != nil {
+		err := createChainCmd.Parse(os.Args[2:])
+		if err != nil {
 			panic(err)
 		}
 	case "printchain":
-		err := printChainCmd.Parse(os.Args[2:]); if err != nil {
+		err := printChainCmd.Parse(os.Args[2:])
+		if err != nil {
 			panic(err)
 		}
 	case "getbalance":
-		err := getBalanceCmd.Parse(os.Args[2:]); if err != nil {
+		err := getBalanceCmd.Parse(os.Args[2:])
+		if err != nil {
 			panic(err)
 		}
 	case "send":
-		err := sendCmd.Parse(os.Args[2:]); if err != nil {
+		err := sendCmd.Parse(os.Args[2:])
+		if err != nil {
 			panic(err)
 		}
 	case "createwallet":
-		err := createWalletCmd.Parse(os.Args[2:]); if err != nil {
+		err := createWalletCmd.Parse(os.Args[2:])
+		if err != nil {
 			panic(err)
 		}
 	default:
@@ -148,7 +153,8 @@ func(cli *CLI) Run() {
 			sendCmd.Usage()
 			os.Exit(1)
 		}
-		amt, err := strconv.Atoi(*createSendAmount); if err != nil {
+		amt, err := strconv.Atoi(*createSendAmount)
+		if err != nil {
 			fmt.Println("Amount must be a number")
 			os.Exit(1)
 		}
