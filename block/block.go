@@ -16,6 +16,7 @@ const (
 	genesisCoinbaseData = "Genesis block for ACN"
 )
 
+// Block represents a single block withing a blockchain. A block contains headers, and the body (transactions). A block always references the previous block in a chain.
 type Block struct {
 	Timestamp int64
 	Transactions []*Transaction
@@ -24,6 +25,7 @@ type Block struct {
 	Nonce int
 }
 
+// DBExists checks whether bolt has a db created. If yes that means there is a blockchain already created
 func DBExists() bool {
 	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
 		return false
@@ -31,10 +33,12 @@ func DBExists() bool {
 	return true
 }
 
+// NewGenesisBlock creates a new genesis block. The genesis block is the initial block created when a blockchain is created.
 func NewGenesisBlock(coinbase *Transaction) *Block {
 	return NewBlock([]*Transaction{coinbase}, []byte{})
 }
 
+// NewBlock takes in a list of transactions, and the previous blocks hash, and creates a new block.
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
 		Timestamp: time.Now().Unix(),
@@ -53,6 +57,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	return block
 }
 
+// Serialize serializes/encodes a block
 func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -64,6 +69,7 @@ func (b *Block) Serialize() []byte {
 	return result.Bytes()
 }
 
+// Deserialize decodes a serialized block
 func DeserializeBlock(d []byte) *Block {
 	var block Block
 
