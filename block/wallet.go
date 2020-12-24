@@ -1,6 +1,7 @@
 package block
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -11,8 +12,8 @@ import (
 
 // Wallet represents a single wallet instance. A wallet contains a private key and a public key
 type Wallet struct {
-	PrivateKey ecdsa.PrivateKey
-	PublicKey  []byte
+	PrivateKey ecdsa.PrivateKey // this private key is a struct containing both a private and public key. A private key is never stored in a database, it should remain... private.
+	PublicKey  []byte // this public key is not hashed. It's generated when you create a private key, and really consists of two parts that are concatenated
 }
 
 // NewWallet returns a wallet struct, with a private and public key
@@ -70,4 +71,14 @@ func checksum(payload []byte) []byte {
 	secondHash := sha256.Sum256(firstHash[:])
 
 	return secondHash[:addressChecksumLen]
+}
+
+func ValidateAddress(address string) bool {
+	pubKeyHash := Base58Decode([]byte(address))
+	actualChecksum := pubKeyHash[len(pubKeyHash)-walletChecksumLen:]
+	version := pubKeyHash[0]
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-walletChecksumLen]
+	targetChecksum := checksum(append([]byte{version}, pubKeyHash...))
+
+	return bytes.Compare(targetChecksum, actualChecksum) == 0
 }

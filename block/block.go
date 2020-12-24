@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	targetBits          = 18
+	targetBits          = 24
 	dbFile              = "blocks.db"
 	blocksBucket        = "blockBucket"
 	subsidy             = 10
@@ -18,6 +18,7 @@ const (
 	// version setting
 	version    = byte(0x00)
 	walletFile = "wallet.dat"
+	walletChecksumLen = 4
 )
 
 // Block represents a single block withing a blockchain. A block contains headers, and the body (transactions). A block always references the previous block in a chain.

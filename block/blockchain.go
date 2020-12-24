@@ -1,21 +1,26 @@
 package block
 
 import (
+	"bytes"
+	"crypto/ecdsa"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/boltdb/bolt"
+	"log"
 	"os"
 )
 
 // Blockchain represents an entire blockchain. It stores the tip/tail/(hash of the last block) in a blockchain.
 type Blockchain struct {
-	Tip []byte
-	DB  *bolt.DB
+	Tip []byte // Tip is the hash of the latest block added to the blockchain
+	DB  *bolt.DB // DB is a reference to a boltDB connection
 }
 
 // BlockchainIterator stores the current hash of the block you are about to iterate over
 type BlockchainIterator struct {
-	currentHash []byte
-	DB          *bolt.DB
+	currentHash []byte // currentHash is the hash that the blockchain will iterate over next
+	DB          *bolt.DB // DB is a reference to a boltDB connection
 }
 
 // CreateBlockchain creates a blockchain. It first creates a genesis block, and signs the output with the address of the creator.
@@ -97,6 +102,12 @@ func NewBlockChain(address string) *Blockchain {
 func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
 
+	for _, tx := range transactions {
+		if !bc.VerifyTransaction(tx) {
+			log.Panic("ERROR: Invalid transaction")
+		}
+	}
+
 	err := bc.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		lastHash = b.Get([]byte("l"))
@@ -152,4 +163,54 @@ func (i *BlockchainIterator) Next() *Block {
 
 	i.currentHash = block.PrevBlockHash
 	return block
+}
+
+// FindTransaction finds a specific transaction across the entire blockchain by its ID.
+func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
+	bci := bc.Iterator()
+
+	for {
+		block := bci.Next()
+
+		for _, tx := range block.Transactions {
+			if bytes.Compare(tx.ID, ID) == 0 {
+				return *tx, nil
+			}
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+	}
+
+	return Transaction{}, errors.New("transaction not found")
+}
+
+// SignTransaction signs a transaction using the Sign method. It takes in the transaction to be signed and the private key to sign with.
+func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
+	prevTXs := make(map[string]Transaction)
+
+	for _, vin := range tx.Vin {
+		prevTX, err := bc.FindTransaction(vin.Txid); if err != nil {
+			// properly handle this error. Return an err if you can't find anything
+			fmt.Println(err)
+		}
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+
+	tx.Sign(privKey, prevTXs)
+}
+
+// Verify transaction verifies a transaction by using the Verify method. It uses the signature and public key stored in the input to verify the entire transaction.
+func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
+	prevTXs := make(map[string]Transaction)
+
+	for _, vin := range tx.Vin {
+		prevTX, err := bc.FindTransaction(vin.Txid); if err != nil {
+			// properly handle this error. Return an err if you can't find anything
+			fmt.Println(err)
+		}
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+	return tx.Verify(prevTXs)
 }
