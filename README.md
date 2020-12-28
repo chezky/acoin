@@ -3,6 +3,10 @@
 
 Acoins is an open source cryptocurrency written purely in golang. All help is greatly appreciated.
 
+### Documentation / Crypto Explanation
+ Check out the [docs](https://godoc.org/github.com/chezky/acoin) for a full crypto explanation.
+
+
 ## Installation
 
 ### Requirements

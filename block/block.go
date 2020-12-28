@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	targetBits          = 24
+	targetBits          = 15
 	dbFile              = "blocks.db"
 	blocksBucket        = "blockBucket"
 	subsidy             = 10
@@ -52,6 +52,19 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block.Nonce = nonce
 
 	return block
+}
+
+// HashTransactions joins together a slice of transaction ID's, and hashes them together. Used when preparing a blocks data.
+// Notice the merkle tree. Instead of saving all transactions and hashing them together, we use a merkle tree instead.
+func (b *Block) HashTransactions() []byte {
+	var transactions [][]byte
+
+	for _, tx := range b.Transactions {
+		transactions = append(transactions, tx.Serialize())
+	}
+
+	mTree := NewMerkleTree(transactions)
+	return mTree.RootNode.Data
 }
 
 // Serialize serializes/encodes a block

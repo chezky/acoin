@@ -99,7 +99,7 @@ func NewBlockChain(address string) *Blockchain {
 
 // MineBlock takes in a list of transactions, finds the last hash of a blockchain, and creates a new block with the transactions and last hash.
 // Then it updates the db and inserts the block, and updates the tail to be the hash of this new block.
-func (bc *Blockchain) MineBlock(transactions []*Transaction) {
+func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 
 	for _, tx := range transactions {
@@ -135,6 +135,8 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	if err != nil {
 		panic(err)
 	}
+
+	return newBlock
 }
 
 // Iterator returns an iterator for a Blockchain
@@ -204,6 +206,10 @@ func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey)
 // Verify transaction verifies a transaction by using the Verify method. It uses the signature and public key stored in the input to verify the entire transaction.
 func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
 	prevTXs := make(map[string]Transaction)
+
+	if tx.IsCoinbase() {
+		return true
+	}
 
 	for _, vin := range tx.Vin {
 		prevTX, err := bc.FindTransaction(vin.Txid); if err != nil {

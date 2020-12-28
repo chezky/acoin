@@ -5,6 +5,10 @@ import (
 )
 
 func (cli *CLI) createChain(address string) {
-	_ = block.CreateBlockchain(address)
+	bc := block.CreateBlockchain(address)
+	defer bc.DB.Close()
+
+	UTXOSet := block.UTXOSet{Blockchain: bc}
+	UTXOSet.Reindex()
 }
 
