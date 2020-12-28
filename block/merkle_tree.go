@@ -61,7 +61,7 @@ func NewMerkleTree(data [][]byte) *MerkleTree {
 	}
 
 	// loop for as many times as half the amount of transactions, as each time it runs, the amount of nodes halve.
-	// Example, there are 4 transactions, which forms 4 lead nodes. Two more nodes e and f, are created concatenating the hash of two nodes each. one new node is a
+	// Example, there are 4 transactions, which forms 4 leaf nodes. Two more nodes e and f, are created concatenating the hash of two nodes each. one new node is a
 	// concatenation of node a+b, while the other is a concatenation of node c,d. Another node g is created by concatenating e,f. g is the root node of the merkle tree.
 	// In this example, i runs twice, while j runs a total of 8 times. 4 times per loop of i. First loop finishes with 2 nodes, and second loop finishes with one node.
 	// The goal is to have this for loop always end with nodes being of length 1.

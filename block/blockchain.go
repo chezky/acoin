@@ -69,7 +69,7 @@ func CreateBlockchain(address string) *Blockchain {
 }
 
 // NewBlockChain doesn't create a blockchain, instead it identifies the tail of a previous blockchain, and that becomes the starting point of the new blockchain.
-func NewBlockChain(address string) *Blockchain {
+func NewBlockChain(nodeID string) *Blockchain {
 	if !DBExists() {
 		fmt.Println("No existing blockchain found. Please create one first.")
 		os.Exit(1)
@@ -100,7 +100,10 @@ func NewBlockChain(address string) *Blockchain {
 // MineBlock takes in a list of transactions, finds the last hash of a blockchain, and creates a new block with the transactions and last hash.
 // Then it updates the db and inserts the block, and updates the tail to be the hash of this new block.
 func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
-	var lastHash []byte
+	var (
+		lastHash []byte
+		lastHeight int
+	)
 
 	for _, tx := range transactions {
 		if !bc.VerifyTransaction(tx) {
@@ -111,13 +114,15 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 	err := bc.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		lastHash = b.Get([]byte("l"))
+		serializedBlock := b.Get(lastHash)
+		lastHeight = DeserializeBlock(serializedBlock).Height
 		return nil
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	newBlock := NewBlock(transactions, lastHash)
+	newBlock := NewBlock(transactions, lastHash, lastHeight+1)
 
 	err = bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
@@ -219,4 +224,34 @@ func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
 	return tx.Verify(prevTXs)
+}
+
+func (bc Blockchain) GetBestHeight() int {
+	var bestHeight int
+
+	err := bc.DB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(blocksBucket))
+		lastHash := b.Get([]byte("l"))
+		lastBlock := b.Get([]byte(lastHash))
+		bestHeight = DeserializeBlock(lastBlock).Height
+		return nil
+	}); if err != nil {
+		panic(err)
+	}
+	return bestHeight
+}
+
+func (bc Blockchain) GetBlockHashes() [][]byte {
+	var blockHashes [][]byte
+	itr := bc.Iterator()
+
+	for {
+		blk := itr.Next()
+
+		blockHashes = append(blockHashes, blk.Hash)
+		if len(blk.PrevBlockHash) == 0 {
+			break
+		}
+	}
+	return blockHashes
 }

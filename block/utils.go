@@ -1,6 +1,8 @@
 package block
 
 import (
+	"bytes"
+	"encoding/gob"
 	"os"
 	"strconv"
 )
@@ -23,4 +25,14 @@ func ReverseBytes(data []byte) {
 	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
 		data[i], data[j] = data[j], data[i]
 	}
+}
+
+func GobEncode(data interface{}) []byte{
+	var buff bytes.Buffer
+
+	enc := gob.NewEncoder(&buff)
+	err := enc.Encode(&data); if err != nil {
+		panic(err)
+	}
+	return buff.Bytes()
 }

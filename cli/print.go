@@ -14,6 +14,7 @@ func (cli *CLI) printChain() {
 		blk := itr.Next()
 
 		fmt.Printf("Prev Hash: %x\n", blk.PrevBlockHash)
+		fmt.Printf("Block height: %d\n", blk.Height)
 		fmt.Printf("TX count: %d\n", len(blk.Transactions))
 		for idx, tx := range blk.Transactions {
 			fmt.Printf("TX #: %x/%x\n", idx+1, len(blk.Transactions))

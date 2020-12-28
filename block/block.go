@@ -21,6 +21,7 @@ const (
 	walletChecksumLen = 4
 )
 
+// TODO: implement block height
 // Block represents a single block withing a blockchain. A block contains headers, and the body (transactions). A block always references the previous block in a chain.
 type Block struct {
 	Timestamp     int64
@@ -28,21 +29,23 @@ type Block struct {
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
+	Height        int
 }
 
 // NewGenesisBlock creates a new genesis block. The genesis block is the initial block created when a blockchain is created.
 func NewGenesisBlock(coinbase *Transaction) *Block {
-	return NewBlock([]*Transaction{coinbase}, []byte{})
+	return NewBlock([]*Transaction{coinbase}, []byte{}, 0)
 }
 
 // NewBlock takes in a list of transactions, and the previous blocks hash, and creates a new block.
-func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash []byte, height int) *Block {
 	block := &Block{
 		Timestamp:     time.Now().Unix(),
 		Transactions:  transactions,
 		PrevBlockHash: prevBlockHash,
 		Hash:          []byte{},
 		Nonce:         0,
+		Height:        height,
 	}
 
 	pow := NewProofOfWork(block)
